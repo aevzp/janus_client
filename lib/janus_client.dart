@@ -119,8 +119,10 @@ class JanusClient {
     } else if (_sessionId != null && handleId != null) {
       suffixUrl = suffixUrl + "/$_sessionId/$handleId";
     }
+    var url = 'https://example.com/whatsit/create';
+
     var response =
-        (await http.post(_currentJanusUri + suffixUrl, body: stringify(bod)))
+        (await http.post(Uri.parse(_currentJanusUri + suffixUrl), body: stringify(bod)))
             .body;
     print(response);
     return parse(response);
@@ -136,7 +138,7 @@ class JanusClient {
     } else if (_sessionId != null && handleId != null) {
       suffixUrl = suffixUrl + "/$_sessionId/$handleId";
     }
-    return parse((await http.get(_currentJanusUri + suffixUrl)).body);
+    return parse((await http.get(Uri.parse(_currentJanusUri + suffixUrl))).body);
   }
 
   /*private method that tries to establish rest connection with janus server,
@@ -466,7 +468,7 @@ class JanusClient {
       if (apiSecret != null) longpoll = longpoll + "&apisecret=" + apiSecret;
       print(longpoll);
       print("polling active");
-      var json = parse((await http.get(longpoll)).body);
+      var json = parse((await http.get(Uri.parse(longpoll))).body);
       (json as List<dynamic>).forEach((element) {
         _handleEvent(plugin, element);
       });
