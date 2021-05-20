@@ -1,7 +1,4 @@
-!!! MAIN LIBRARY IS HERE >> https://github.com/shivanshtalwar0/flutter_janus_client
-
-
-[![ko-fi](https://www.ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/U7U11OZL8)
+[![ko-fi](https://www.ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/U7U11OZL8) [![Join the chat at https://gitter.im/flutter_janus_client/community](https://badges.gitter.im/flutter_janus_client/community.svg)](https://gitter.im/flutter_janus_client/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)  
 
 <a href="https://www.buymeacoffee.com/gr20hjk" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" style="height: 51px !important;width: 217px !important;" ></a>
 # janus_client
@@ -16,8 +13,10 @@ For more info visit
 
 
 
-**please note:-Although all features are working as expected but testing of api is still not complete please consider testing out this plugin so that this plugin can be production ready**
+**please note:-Although all features are working as expected but testing of api is still not complete please consider testing out this plugin so that this plugin can be production ready**  
 
+
+**Note:- Version 2 of flutter_janus_client is underway if you want to experience or play with latest api then you can switch to v2 branch**
 # Video Call Sample
 <a href='https://youtu.be/wRo5nd7JnB4'><img src='https://github.com/shivanshtalwar0/flutter_janus_client/raw/master/samples/videocall_preview.jpg' 
                                             width='300' height='600'></a>

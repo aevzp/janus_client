@@ -10,6 +10,9 @@ import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:http/http.dart' as http;
 import 'utils.dart';
+export 'Plugin.dart';
+export 'utils.dart';
+export 'WebRTCHandle.dart';
 
 /// Main Class for setting up janus server connection details and important methods for interacting with janus server
 class JanusClient {
@@ -47,8 +50,6 @@ class JanusClient {
   WebSocketSink _webSocketSink;
 
   get isConnected => _connected;
-
-  get isUnifiedPlan_ => isUnifiedPlan;
 
   get currentJanusURI => _currentJanusUri;
 
@@ -110,6 +111,11 @@ class JanusClient {
   }
 
   /*
+  * // According to this [Issue](https://github.com/meetecho/janus-gateway/issues/124) we cannot change Data channel Label
+  * */
+  String get dataChannelDefaultLabel => "JanusDataChannel";
+
+  /*
   * private method for posting data to janus by using http client
   * */
   Future<dynamic> _postRestClient(bod, {int handleId}) async {
@@ -119,11 +125,9 @@ class JanusClient {
     } else if (_sessionId != null && handleId != null) {
       suffixUrl = suffixUrl + "/$_sessionId/$handleId";
     }
-    var url = 'https://example.com/whatsit/create';
-
-    var response =
-        (await http.post(Uri.parse(_currentJanusUri + suffixUrl), body: stringify(bod)))
-            .body;
+    var response = (await http.post(Uri.parse(_currentJanusUri + suffixUrl),
+            body: stringify(bod)))
+        .body;
     print(response);
     return parse(response);
   }
@@ -138,7 +142,8 @@ class JanusClient {
     } else if (_sessionId != null && handleId != null) {
       suffixUrl = suffixUrl + "/$_sessionId/$handleId";
     }
-    return parse((await http.get(Uri.parse(_currentJanusUri + suffixUrl))).body);
+    return parse(
+        (await http.get(Uri.parse(_currentJanusUri + suffixUrl))).body);
   }
 
   /*private method that tries to establish rest connection with janus server,
@@ -174,7 +179,7 @@ class JanusClient {
 
 //todo:implement all http connect interface
     } catch (e) {
-      if (_keepAliveTimer!=null) {
+      if (_keepAliveTimer != null) {
         _keepAliveTimer.cancel();
       }
 
@@ -225,7 +230,6 @@ class JanusClient {
     if (_keepAliveTimer != null) {
       _keepAliveTimer.cancel();
     }
-
 
     //close WebSocket
     if (_webSocketChannel != null) _webSocketChannel.sink.close();
@@ -280,15 +284,15 @@ class JanusClient {
     Map<String, dynamic> configuration = {
       "iceServers": iceServers.map((e) => e.toMap()).toList()
     };
+    configuration.putIfAbsent('sdpSemantics', () => 'plan-b');
     if (isUnifiedPlan) {
       configuration.putIfAbsent('sdpSemantics', () => 'unified-plan');
     }
+
     RTCPeerConnection peerConnection =
         await createPeerConnection(configuration, {});
-    WebRTCHandle webRTCHandle = WebRTCHandle(
-      iceServers: iceServers,
-    );
-    webRTCHandle.pc = peerConnection;
+    WebRTCHandle webRTCHandle = WebRTCHandle(peerConnection: peerConnection);
+    webRTCHandle.dataChannel = {};
     plugin.webRTCHandle = webRTCHandle;
     plugin.apiSecret = apiSecret;
     plugin.sessionId = _sessionId;
@@ -314,7 +318,7 @@ class JanusClient {
         plugin.onRemoteTrack(event.streams[0], event.track, mid, true);
         if (event.track.onEnded == null) return;
 
-        if (webRTCHandle.pc.receivers != null) {
+        if (webRTCHandle.peerConnection.receivers != null) {
           var receiverStreams = null;
           // if(event.track.kind == "audio" && webRTCHandle.pc.receivers.first.track["audio"]) {
           //   receiverStreams = event.receiver.createEncodedAudioStreams();
@@ -332,8 +336,8 @@ class JanusClient {
           if (webRTCHandle.remoteStream != null) {
             webRTCHandle.remoteStream.removeTrack(event.track);
             var mid = event.track.id;
-            var transceiverRaw = await peerConnection.transceivers;
-            var transceiver = transceiverRaw.firstWhere((element) => element.receiver.track == event.track);
+            var transceiver = (await peerConnection.transceivers)
+                .firstWhere((element) => element.receiver.track == event.track);
             mid = transceiver.mid;
             plugin.onRemoteTrack(event.streams[0], event.track, mid, false);
           }
@@ -342,14 +346,19 @@ class JanusClient {
           if (webRTCHandle.remoteStream != null) {
             webRTCHandle.remoteStream.removeTrack(event.track);
             var mid = event.track.id;
-            var transceiverRaw = await peerConnection.transceivers;
-            var transceiver = transceiverRaw.firstWhere((element) => element.receiver.track == event.track);
+            var transceiver = (await peerConnection.transceivers)
+                .firstWhere((element) => element.receiver.track == event.track);
             mid = transceiver.mid;
             plugin.onRemoteTrack(event.streams[0], event.track, mid, false);
           }
         };
       };
     }
+    peerConnection.onConnectionState = (state) {
+      if (plugin.onWebRTCState != null) {
+        plugin.onWebRTCState(state);
+      }
+    };
     //      send trickle
     peerConnection.onIceCandidate = (RTCIceCandidate candidate) async {
       debugPrint('sending trickle');
@@ -362,7 +371,6 @@ class JanusClient {
       request["handle_id"] = plugin.handleId;
       request["apisecret"] = plugin.apiSecret;
       request["token"] = plugin.token;
-
       //checking and posting using websocket if in available
       if (!_usingRest) {
         plugin.webSocketSink.add(stringify(request));
@@ -530,12 +538,12 @@ class JanusClient {
       debugPrint("Got a trickled candidate on session " + sessionId.toString());
       debugPrint(candidate.toString());
       var config = pluginHandle.webRTCHandle;
-      if (config.pc != null) {
+      if (config.peerConnection != null) {
         // Add candidate right now
         debugPrint("Adding remote candidate:" + candidate.toString());
         if (candidate.containsKey("sdpMid") &&
             candidate.containsKey("sdpMLineIndex")) {
-          config.pc.addCandidate(RTCIceCandidate(candidate["candidate"],
+          config.peerConnection.addCandidate(RTCIceCandidate(candidate["candidate"],
               candidate["sdpMid"], candidate["sdpMLineIndex"]));
         }
       } else {
@@ -555,9 +563,6 @@ class JanusClient {
       if (pluginHandle == null) {
         debugPrint("This handle is not attached to this session");
       }
-      if (plugin.onWebRTCState != null) {
-        plugin.onWebRTCState(true, null);
-      }
     } else if (json["janus"] == "hangup") {
       // A plugin asked the core to hangup a PeerConnection on one of our handles
       debugPrint("Got a hangup event on session " + sessionId.toString());
@@ -570,9 +575,6 @@ class JanusClient {
       if (pluginHandle == null) {
         debugPrint("This handle is not attached to this session");
       } else {
-        if (plugin.onWebRTCState != null) {
-          pluginHandle.onWebRTCState(false, json["reason"]);
-        }
 //      pluginHandle.hangup();
         if (plugin.onDestroy != null) {
           pluginHandle.onDestroy();
@@ -623,13 +625,13 @@ class JanusClient {
     } else if (json["janus"] == "error") {
       // Oops, something wrong happened
       debugPrint("EOoops: " +
-          json["error"]["code"] +
+          json["error"]["code"].toString() +
           " " +
-          json["error"]["reason"]); // FIXME
+          json["error"]["reason"].toString()); // FIXME
       var transaction = json["transaction"];
-      if (transaction) {
+      if (transaction != null) {
         var reportSuccess = _transactions[transaction];
-        if (reportSuccess) {
+        if (reportSuccess != null) {
           reportSuccess(json);
         }
       }
